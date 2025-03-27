@@ -1,9 +1,9 @@
 # Infinite Retrieval
 
-## Introduce
+## Introduction
 Implementation of currently Submitting Paper: "**Infinite Retrieval: Attention Enhanced LLMs in Long Context Processing**", which can apply any Transformer-based LLMs(Large Language Moidels) to handle unlimited length texts without training.
 
-Notably，our method **InfiniRretri** can enbale the 0.5B(Qwen2.5-0.5B-Instruct), which originally had a maximum context length of 32K, to Haystack(retrieval) up over 1M tokens on Needle-In-a-Haystack(NIH) test, and even theoretically **infinite-length**.
+Notably，our method **InfiniRretri** can enable the 0.5B(Qwen2.5-0.5B-Instruct), which originally had a maximum context length of 32K, to Haystack(retrieval) up over 1M tokens on Needle-In-a-Haystack(NIH) test, and even theoretically **infinite-length**.
 
 ![Origin](imgs/Qwen0.5B-FullKV-128k_0.446.png)
 ![Using InfiniRetri](imgs/Qwen0.5B-InfiniRetri_1m_1.000.png)
@@ -22,31 +22,36 @@ pip install infini-retri==0.0.3
 ```
 
 ### Our Method Initialization
-It's very convenient. You just need to pass in the model and its tokenizer directly, or you can simply passing in the model name or path. Additionally, it should be noted that our method can only using in tranditional **attention-based** Transformer, and the parameter of "attn_implementation" currently should using "eager" or "sdpa", and .
+It's very convenient. You just need to pass in the model and its tokenizer directly, or you can simply passing in the model name or path. Additionally, it should be noted that our method can only using in tranditional **attention-based** Transformer, and the parameter of "attn_implementation" can be either **"eager"** or **"sdpa"**.
 
 ```python  
 from infini_retri import InfiniRetri
 
 model_name_or_path = "Qwen/Qwen2.5-0.5B-Instruct" #  "./models/Qwen2.5-0.5B-Instruct"
 model = AutoModelForCausalLM.from_pretrained(model_name_or_path, attn_implementation="eager") # attn_implementation only using "eager"
-tokenizer = AutoTokenizer.from_pretrained(model_name)
+tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
 
 ir = InfiniRetri(model, tokenizer)
 # ir = InfiniRetri(name_or_path=model_name_or_path) 
 ```
 
 ### Our Method in Model Inference
-Our methodis to design an innovative processing mechanisum during the ***model inference(fix model.generate())*** to handle texts that exceed the upper limit of the original context length. Specifically, when use, there are there parameters of inputting text: `context`, `question`, `prompt`, as follows:
-- `context:` (str) required option in the input text, just the complete contextual content that needs to be procssed(no include question and prompt).
-- `question`: (str) option parameter,  passed in is your question for the LLMs, for example, the Question text in QA Pair is passed in this parameter. For all tasks, this parameter is recommended to be filled in, as it has a significant impact on the understanding of the LLMs and the ability to provide correct answers.
-- `prompt`:  (str) option parameter, the instruction template(no including model instruct prompt, just task teamplate prompt) that concatenates the `context` and `question` text sections above, especially noting that **when concatenating the `context` and `question` text sections, two "\n\n" are used to distinguish the boundaries of the text in each section. This is a necessary condition for our method to run normally**.  For example, its default prompt template is `"Read the book and answer the question. Be very concise in your answer.\n\n{context}\n\nQuestion:\n\n{question}\n\nAnswer:"`.
+Our method introduces an innovative processing mechanism during model inference (specifically, modifying model.generate()) to handle texts exceeding the original context length limit. When using our method, there are three input parameters for the text:
+
+- `context` (str, required): This parameter represents the complete contextual content that needs processing. It should not include the question or the prompt.
+
+- `question` (str, optional): This parameter is for your specific query to the LLM. For example, the question part in a QA pair should be passed here. We highly recommend including this parameter for all tasks, as it significantly influences the LLM's comprehension and accuracy in generating the correct answers.
+
+- `prompt` (str, optional): This is the instruction template (excluding the model's built-in instruction prompt, containing only the task-specific template). It concatenates the context and question parameters mentioned above. Note importantly: When concatenating the context and question, two "\n\n" newline characters must separate these sections clearly. This separation is required for our method to function properly. The default prompt template is provided as an example below:`"Read the book and answer the question. Be very concise in your answer.\n\n{context}\n\nQuestion:\n\n{question}\n\nAnswer:"`.
 "
 
-In addition, three parameters are provided here for everyone to adjust according to different types of tasks to achieve the best answer effect, as follows:
+In addition, three parameters are provided to allow users to adjust the method according to different task types for optimal performance:
 
-- `window_length`: (int, default 1024) this controls the length of the context window during the execution of our method. When setting , it only need to ensure that it is less than the maximum context window of the your using model.
-- `topk`: (int, default 300) It affects the cache capacity size during the operation of our method and the actual length of context to be processed throughout the inference process. In theory, the larger the value, the larger the retrieval range during the operation. The actual optimal value depends on the user's problem handling and can be self adjusted.
-- `answer_length`:(int, default 8) It affects the effectiveness of outputting the correct answer, and its value can be set based on the user's expected token length of the correct answer in the `context` section. In theory, the closer the token length is set to the correct answer in the `context`, the better the effect of the model's answer under our method.
+- `window_length` (int, default=1024): Controls the length of the context window during the execution of our method. Ensure this value is set below the maximum context window size of the model you are using.
+
+- `topk` (int, default=300): Affects the cache capacity and the effective context length processed during inference. Generally, larger values expand the retrieval range. The optimal value varies based on the specific problem and can be adjusted accordingly.
+
+- `answer_length` (int, default=8): Influences the accuracy of the generated answer. Set this parameter based on the expected token length of the correct answer within the context. Ideally, the closer this value matches the token length of the correct answer, the better the model's response.
 
 
 ```python
